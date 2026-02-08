@@ -1,99 +1,94 @@
 import express from 'express';
+import cors from 'cors';
 import pokemon from './schema/pokemon.js';
-
 import './connect.js';
 
 const app = express();
 
+app.use(cors());
+app.use(express.json());
+
+// Test serveur
 app.get('/', (req, res) => {
   res.send('Hello, World!');
 });
 
-/*
-app.get('/pokemons', async (req, res) => {
-  try {
-    const pokemons = await pokemon.find({});
-    res.json(pokemons);
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-})
-*/
-
-app.get('/pokemons/:param', async (req, res) => {
-  try {
-    const param = req.params.param;
-    const pokeId = parseInt(param, 10);
-    
-    let poke;
-    if (!isNaN(pokeId)) {
-      // Recherche par ID
-      poke = await pokemon.findOne({ id: pokeId });
-    } else {
-      // Recherche par nom (english ou french)
-      poke = await pokemon.findOne({
-        $or: [
-          { "name.english": { $regex: param, $options: 'i' } },
-          { "name.french": { $regex: param, $options: 'i' } }
-        ]
-      });
-    }
-    
-    if (poke) {
-      res.json(poke);
-    } else {
-      res.status(404).json({ error: 'Pokemon not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
-});
-
-//GET les pokemons 20 par 20, faire un systeme de pagination,
+// GET paginé
 app.get('/pokemons', async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = 20;
     const skip = (page - 1) * limit;
+
     const pokemons = await pokemon.find({}).skip(skip).limit(limit);
     res.json(pokemons);
-  } catch (error) {
+  } catch {
     res.status(500).json({ error: 'Internal Server Error' });
   }
-})
+});
 
-//DELETE supprimer un pokemon de la base,
-app.delete('/pokemons/delete/:id', async (req, res) => {
+// GET par id OU nom
+app.get('/pokemons/:param', async (req, res) => {
+  try {
+    const param = req.params.param;
+    const pokeId = parseInt(param, 10);
+
+    const poke = !isNaN(pokeId)
+      ? await pokemon.findOne({ id: pokeId })
+      : await pokemon.findOne({
+          $or: [
+            { "name.english": { $regex: `^${param}$`, $options: 'i' } },
+            { "name.french": { $regex: `^${param}$`, $options: 'i' } }
+          ]
+        });
+
+    if (!poke) {
+      return res.status(404).json({ error: 'Pokemon not found' });
+    }
+
+    res.json(poke);
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// DELETE
+app.delete('/pokemons/:id', async (req, res) => {
   try {
     const pokeId = parseInt(req.params.id, 10);
-    const deletedPokemon = await pokemon.findOneAndDelete({ id: pokeId });
-    if (deletedPokemon) {
-      res.json({ message: 'Pokemon deleted successfully' });
-    } else {
-      res.status(404).json({ error: 'Pokemon not found' });
+    const deleted = await pokemon.findOneAndDelete({ id: pokeId });
+
+    if (!deleted) {
+      return res.status(404).json({ error: 'Pokemon not found' });
     }
-  } catch (error) {
+
+    res.json({ message: 'Pokemon deleted' });
+  } catch {
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-console.log('Server is set up. Ready to start listening on a port.');
+// UPDATE
+app.put('/pokemons/:id', async (req, res) => {
+  try {
+    const pokeId = parseInt(req.params.id, 10);
+
+    const updatedPokemon = await pokemon.findOneAndUpdate(
+      { id: pokeId },
+      req.body,
+      { new: true }
+    );
+
+    if (!updatedPokemon) {
+      return res.status(404).json({ error: 'Pokemon not found' });
+    }
+
+    res.json(updatedPokemon);
+  } catch {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 app.listen(3000, () => {
-  console.log('Server is running on http://localhost:3000');
-});
-
-//UPDATE modifier les infos d'un pokemon dans la base,
-app.update('/pokemons/update/:id', async (req, res) => {
-  try {    const pokeId = parseInt(req.params.id, 10);
-    const updatedData = req.body; 
-    const updatedPokemon = await pokemon.findOneAndUpdate({ id: pokeId }, updatedData, { new: true });
-    if (updatedPokemon) {
-      res.json(updatedPokemon); 
-    } else {
-      res.status(404).json({ error: 'Pokemon not found' });
-    }
-  } catch (error) {
-    res.status(500).json({ error: 'Internal Server Error' });
-  }
+  console.log('Server running on http://localhost:3000');
 });
