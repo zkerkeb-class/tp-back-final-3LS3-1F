@@ -62,12 +62,38 @@ app.get('/pokemons', async (req, res) => {
   }
 })
 
-
-
-
+//DELETE supprimer un pokemon de la base,
+app.delete('/pokemons/delete/:id', async (req, res) => {
+  try {
+    const pokeId = parseInt(req.params.id, 10);
+    const deletedPokemon = await pokemon.findOneAndDelete({ id: pokeId });
+    if (deletedPokemon) {
+      res.json({ message: 'Pokemon deleted successfully' });
+    } else {
+      res.status(404).json({ error: 'Pokemon not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 console.log('Server is set up. Ready to start listening on a port.');
 
 app.listen(3000, () => {
   console.log('Server is running on http://localhost:3000');
+});
+
+//UPDATE modifier les infos d'un pokemon dans la base,
+app.update('/pokemons/update/:id', async (req, res) => {
+  try {    const pokeId = parseInt(req.params.id, 10);
+    const updatedData = req.body; 
+    const updatedPokemon = await pokemon.findOneAndUpdate({ id: pokeId }, updatedData, { new: true });
+    if (updatedPokemon) {
+      res.json(updatedPokemon); 
+    } else {
+      res.status(404).json({ error: 'Pokemon not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
